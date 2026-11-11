@@ -34,8 +34,11 @@ def create_app(test_config=None, approval_client=None, store=None):
         database.audit(tx.request_id,"N8N_APPROVAL_SUBMITTED",{"fingerprint":fingerprint})
         decision=client.request_human_approval(transaction)
         if decision!="APPROVE":
+            if decision == "DENY": database.set_approval_decision(tx.request_id,fingerprint,"DENY","n8n-verified")
             database.audit(tx.request_id,"APPROVAL_NOT_GRANTED",{"decision":decision})
             return jsonify({"request_id":tx.request_id,"decision":"DENY","execution_enabled":False}),403
+        if not database.set_approval_decision(tx.request_id,fingerprint,"APPROVE","n8n-verified"):
+            return jsonify({"request_id":tx.request_id,"decision":"DENY","reason":"approval_record_mismatch"}),403
         if not database.consume_approval(tx.request_id,fingerprint): return jsonify({"request_id":tx.request_id,"decision":"DENY","reason":"approval_invalid_or_replayed"}),403
         database.audit(tx.request_id,"HUMAN_APPROVAL_VERIFIED",{"fingerprint":fingerprint})
         return jsonify({"request_id":tx.request_id,"decision":"APPROVED_PENDING_EXECUTION","execution_enabled":False,"message":"Approval verified. No funds have been transferred."}),200
