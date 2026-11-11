@@ -25,7 +25,7 @@ Python 3.11+:
     source .venv/bin/activate
     pip install -r requirements-dev.txt
     cp .env.example .env
-    python app.py
+    python run.py
 
 Open http://127.0.0.1:5000. Without configured n8n endpoints, human-review requests fail closed to DENY.
 
