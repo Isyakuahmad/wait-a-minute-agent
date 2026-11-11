@@ -12,8 +12,8 @@ class N8NApprovalClient:
         self.webhook_url=webhook_url or os.getenv("N8N_WEBHOOK_URL")
         self.status_url=status_url or os.getenv("N8N_STATUS_URL")
         self.api_token=api_token or os.getenv("N8N_API_TOKEN")
-        self.timeout_seconds=int(timeout_seconds or os.getenv("N8N_TIMEOUT_SECONDS","300"))
-        self.poll_interval=int(poll_interval or os.getenv("N8N_POLL_INTERVAL_SECONDS","3"))
+        self.timeout_seconds=int(timeout_seconds if timeout_seconds is not None else os.getenv("N8N_TIMEOUT_SECONDS","300"))
+        self.poll_interval=int(poll_interval if poll_interval is not None else os.getenv("N8N_POLL_INTERVAL_SECONDS","3"))
         self.session=session or requests.Session()
 
     def request_human_approval(self, transaction: dict[str,Any]) -> str:
