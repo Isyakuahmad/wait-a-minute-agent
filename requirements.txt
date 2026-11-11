@@ -1,4 +1,4 @@
-Flask==3.0.0
-requests==2.31.0
-py-near==0.17.2
-python-dotenv==1.0.0
+Flask>=3.0,<4
+pydantic>=2.7,<3
+requests>=2.31,<3
+python-dotenv>=1.0,<2
