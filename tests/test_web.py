@@ -50,6 +50,7 @@ def test_missing_authorization_fails_closed(tmp_path):
 
 def test_allow_consumes_authorization_once(tmp_path):
     store=setup_store(tmp_path/"w.db"); app=create_app({"TESTING":True},store=store)
+    app.extensions["guardrail_engine"].trusted_recipients.add("unknown.testnet")
     client=app.test_client(); data=payload(); data["amount"]="10"
     first=client.post("/api/transactions/evaluate",json=data)
     assert first.status_code==200 and first.json["decision"]=="ALLOW"
