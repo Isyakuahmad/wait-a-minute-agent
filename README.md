@@ -1,21 +1,78 @@
-# Wait a Minute Agent
+# The Piggy Bank That Says Wait a Minute
 
-An intent-aware security guardrail for autonomous AI agents that request NEAR transactions.
+Technical repository: wait-a-minute-agent. An intent-aware security guardrail for AI agents that propose NEAR transactions.
 
-The guardrail evaluates transaction requests before any wallet execution using amount, velocity, and recipient policies. Risky requests are paused for human approval; explicitly blocked recipients are denied.
+## Implemented on this branch
 
-## Project status
+- Python transaction models and policy engine: ALLOW, ASK_HUMAN, DENY.
+- SQLite persistence for trusted spending authorizations, approval requests and audit events.
+- Independently stored authorization limits bound to agent, recipient, asset, network and expiry.
+- Single-use, revocable authorizations; amount/recipient/agent/network substitution and replay are rejected.
+- n8n approval client verifies request ID and transaction fingerprint and fails closed on errors/timeouts.
+- Flask demo UI and JSON API.
+- Tests for authorization enforcement, replay prevention, fingerprint tampering and API behavior.
+- Telegram/n8n setup guide: docs/N8N_TELEGRAM_SETUP.md.
 
-Early development. The first milestone is a tested Python policy engine. NEAR wallet execution is intentionally not enabled yet.
+## Architecture
 
-## Security principle
+Trusted operator authorization → AI transaction proposal → Python Guardrail → ALLOW / DENY / ASK_HUMAN → n8n human approval → fingerprint verification → APPROVED_PENDING_EXECUTION.
 
-The AI agent must never receive unrestricted access to the wallet signing key. All transactions must pass through the guardrail enforcement boundary.
+The agent supplies an authorization ID but cannot create or enlarge the authorization through the transaction API. The authorization is created through the trusted local/operator store interface, separately from agent input. The intended_amount field is informational only and never determines spending authority.
 
-## Planned milestones
+The NEAR MCP server is a future controlled execution adapter. It is not connected here. No wallet signing or fund transfer is enabled.
 
-1. Python guardrail engine and tests
-2. SQLite persistence and audit trail
-3. Human approval interface
-4. NEAR testnet integration
-5. Attack simulations and demo
+## Run locally
+
+Python 3.11+:
+
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install -r requirements-dev.txt
+    cp .env.example .env
+    python run.py
+
+Open http://127.0.0.1:5000. Without configured n8n endpoints, human-review requests fail closed to DENY.
+
+Run tests with pytest -q.
+
+## Creating a trusted authorization (operator-side)
+
+Create authorizations from a trusted administrative script or console—not from an agent-facing API:
+
+    from datetime import datetime, timedelta, timezone
+    from app.store import SQLiteStore
+
+    store = SQLiteStore("data/guardrail.db")
+    store.create_authorization(
+        authorization_id="auth-001",
+        agent_id="demo-agent",
+        recipient="seller.testnet",
+        max_amount="10",
+        asset="NEAR",
+        network="testnet",
+        expires_at=(datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
+        created_by="operator:local",
+    )
+
+Use a unique authorization ID for each intended payment. Revoke unused authorizations with store.revoke_authorization("auth-001"). The first successful ALLOW or human-approved path consumes the authorization; it cannot be reused.
+
+## n8n setup
+
+Follow docs/N8N_TELEGRAM_SETUP.md. Configure authenticated endpoints to submit an approval request and return PENDING, APPROVE or DENY with the original fingerprint. Restrict Telegram approval to the designated human approver.
+
+## Environment variables
+
+See .env.example. Never commit .env, Telegram tokens, n8n credentials, NEAR private keys or wallet secrets.
+
+## Security boundaries and limitations
+
+- Spending authority is loaded from SQLite; caller-supplied intended_amount is descriptive only.
+- Authorizations are bound to agent, exact recipient, asset, network, maximum amount and expiry.
+- Authorizations are revocable and consumed once using conditional SQLite updates.
+- Human approval is fingerprint-bound and consumed once. It does not execute a transfer.
+- The API returns APPROVED_PENDING_EXECUTION and execution_enabled=false; no funds are transferred.
+- Runtime trusted/blocked recipient sets remain in-memory configuration.
+- The trusted authorization creation method is an operator-side library interface, not yet a separately authenticated admin UI/CLI. Protect database access and the operator environment.
+- NEAR MCP tools, wallet signing, on-chain execution and attack simulations are not implemented yet.
+
+Hackathon prototype only; not a production wallet security product.
