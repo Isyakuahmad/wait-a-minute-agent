@@ -1,0 +1,35 @@
+import pytest
+from decimal import Decimal
+from guardrail import SQLiteStore, PiggyBankGuardrail, Decision
+
+def tx(recipient, intended_amount, amount):
+    """Helper function to create a fake transaction for testing."""
+    return {
+        "recipient": recipient,
+        "intended_amount": intended_amount,
+        "amount": amount,
+        "token": "NEAR",
+        "network": "testnet"
+    }
+
+def test_agent_cannot_inflate_its_own_intent(tmp_path):
+    # 1. Setup the database and guardrail
+    store = SQLiteStore(str(tmp_path / "guardrail.db"))
+    guardrail = PiggyBankGuardrail(store)
+    
+    # 2. Add a trusted seller
+    guardrail.trusted_recipients.add("seller.testnet")
+
+    # 3. Create a sneaky transaction
+    # The AI says it wants to spend 10, but tries to spend 1000!
+    proposal = tx(
+        recipient="seller.testnet",
+        intended_amount=Decimal("10"),
+        amount=Decimal("1000"),
+    )
+
+    # 4. Run the guardrail
+    result = guardrail.evaluate(proposal)
+
+    # 5. The guardrail MUST catch this. It cannot be ALLOWED.
+    assert result.decision != Decision.ALLOW
