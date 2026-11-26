@@ -67,6 +67,16 @@ class SQLiteStore:
         except sqlite3.IntegrityError:
             return False
 
+    def list_authorizations(self) -> list[dict]:
+        """Return authorization records for the trusted operator interface."""
+        with self.connect() as db:
+            rows = db.execute(
+                """SELECT authorization_id, agent_id, recipient, max_amount, asset, network,
+                          expires_at, created_at, created_by, consumed_at, revoked_at
+                   FROM trusted_authorizations ORDER BY created_at DESC, authorization_id"""
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def get_authorization(self, authorization_id: str) -> dict | None:
         with self.connect() as db:
             row=db.execute("SELECT * FROM trusted_authorizations WHERE authorization_id=?",(authorization_id,)).fetchone()
