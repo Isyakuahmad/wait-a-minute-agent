@@ -35,26 +35,45 @@ Open http://127.0.0.1:5000. Without configured n8n endpoints, human-review reque
 
 Run tests with pytest -q.
 
-## Creating a trusted authorization (operator-side)
+## Trusted operator authorization CLI
 
-Create authorizations from a trusted administrative script or console—not from an agent-facing API:
+Create and manage spending authorizations from the trusted operator's local terminal.
+This CLI is deliberately separate from the agent-facing transaction API; do not expose
+it as a web endpoint or run it in an untrusted environment with database access.
 
-    from datetime import datetime, timedelta, timezone
-    from app.store import SQLiteStore
+Create a one-time authorization (defaults to NEAR on testnet, expiring in 15 minutes):
 
-    store = SQLiteStore("data/guardrail.db")
-    store.create_authorization(
-        authorization_id="auth-001",
-        agent_id="demo-agent",
-        recipient="seller.testnet",
-        max_amount="10",
-        asset="NEAR",
-        network="testnet",
-        expires_at=(datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
-        created_by="operator:local",
-    )
+    python -m app.operator_cli --db data/guardrail.db create \
+      --authorization-id auth-001 \
+      --agent-id demo-agent \
+      --recipient seller.testnet \
+      --max-amount 2.5
 
-Use a unique authorization ID for each intended payment. Revoke unused authorizations with store.revoke_authorization("auth-001"). The first successful ALLOW or human-approved path consumes the authorization; it cannot be reused.
+Set a longer expiry or different asset/network explicitly:
+
+    python -m app.operator_cli --db data/guardrail.db create \
+      --authorization-id auth-002 \
+      --agent-id demo-agent \
+      --recipient buyer.testnet \
+      --max-amount 5 \
+      --asset NEAR \
+      --network testnet \
+      --expires-in-minutes 30 \
+      --created-by operator:local
+
+List records and their status (ACTIVE, EXPIRED, REVOKED or CONSUMED):
+
+    python -m app.operator_cli --db data/guardrail.db list
+
+Revoke an unused authorization:
+
+    python -m app.operator_cli --db data/guardrail.db revoke auth-001
+
+The CLI uses the existing SQLiteStore methods, so creation and revocation are recorded
+in the audit log. IDs are unique; use a fresh ID for every intended payment.
+A successful authorization is single-use. An agent cannot create, expand, or revoke
+authorizations through its transaction request.
+
 
 ## n8n setup
 
